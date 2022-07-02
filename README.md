@@ -28,25 +28,47 @@ make debug
 
 ### Eclipse的配置
 
+启动Eclipse，`Window->Preferences->General->Workspace` 中的`Build Automatically`选项去掉。
+
+### Eclipse导入linux0.11源码
+![导入源码](./img/1.png)
+
+### Eclipse导入linux0.11配置debug
+![配置debug1](./img/2.png)
+
+![配置debug2](./img/3.png)
+
+* 完成eclipse配置点击`debug`，在点击debug的前，先要在terminal启动linux，即`make debug`
+* 在eclipse Debugger Console 输入对应得gdb命令
+
+### 愉快的开始Debug
+
+![Debugger Console](./img/4.png)
+
+1. terminal中在linux0.11的目录下输入`make debug`
+2. eclipse 开始debug
+3. 打开eclipse的debuggerconsole ，输入对应得gdb命令
+4. 看上图
+
 Debugger Console
 ```
-(gdb)file tools/system
-(gdb)directory ./
-(gdb)set architectur i8086
-(gdb)set disassembly-flavor intel
-(gdb)b *0x7c00
-(gdb)layout split
+(gdb)file tools/system //加载符号
+(gdb)directory ./linux0.11 //设置源码目录 可以不设置
+(gdb)set architectur i8086  // 设置成i8086模式，用来调试16位室模式代码，可以不设置
+(gdb)set disassembly-flavor intel //将汇编显示成intel 格式，好看一些，可以不设置
+(gdb)b *0x7c00 // 在地址0x7c00处打断点 可以不设置，我一般直接断点 main函数
+(gdb)layout split  
 (gdb)c
 ```
 
 ```
 (gdb)x/16xb 0x7DF0
 ```
-
+单步执行
 ```
 si
 ```
-
+断点main函数
 ```
 b main
 ```
