@@ -20,6 +20,12 @@
  * won't be any messing with the stack from main(), but we define
  * some others too.
  */
+/**
+ * c语言一般使用call xxx 方法来调用其他函数，如果其他函数有参数时，会push xxx 到对应的堆栈上。
+ * 调用fork创建新进程时，需要复制task0的任务数据结构，包括其他用户堆栈指针，
+ * 因此要求任务0的用户态堆栈在创建任务1（进程1）之前保持干净，
+ * 所以需要使用inline函数，保持堆栈"干净状态"。
+ */
 static inline fork(void) __attribute__((always_inline));
 static inline pause(void) __attribute__((always_inline));
 static inline _syscall0(int,fork)

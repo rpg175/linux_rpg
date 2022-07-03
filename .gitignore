@@ -24,4 +24,4 @@ kernel/math/math.a
 kernel/math/math_emulate.o
 lib/lib.a
 tools/system
-
+.idea/*
