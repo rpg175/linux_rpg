@@ -45,22 +45,26 @@
 	.equ ROOT_DEV, 0x301
 	ljmp    $BOOTSEG, $_start
 _start:
-	mov	$BOOTSEG, %ax
-	mov	%ax, %ds
+	mov	$BOOTSEG, %ax  # 由于“两头约定”和“定位识别”，所以在开始时bootsect“被迫”加载到0x07C00位置。
+	mov	%ax, %ds       # 将0x07c0赋值到ds寄存器
 	mov	$INITSEG, %ax
-	mov	%ax, %es
-	mov	$256, %cx
+	mov	%ax, %es       # 将0x9000赋值到es寄存器
+	mov	$256, %cx      # 循环256，,256个字正好是512字节
 	sub	%si, %si
 	sub	%di, %di
 	rep	
 	movsw
-	ljmp	$INITSEG, $go
-go:	mov	%cs, %ax
+	ljmp	$INITSEG, $go  # 现在将自身移至0x90000处，说明操作系统开始根据自己的需要安排内存了。
+go:	mov	%cs, %ax  # CS: 现在是0x9000, IP: 现在是0x9000,go：mov ax,cs这一行执行时CS和IP的状态
+# jmpi go,INITSEG与go：mov ax,cs配合，巧妙地实现了“到新位置后接着原来的执行序继续执行下去”的目的。
+# bootsect复制到了新的地方，并且要在新的地方继续执行。因为代码的整体位置发生了变化，所以代码中的各个段也会发生变化。
+# 前面已经改变了CS，现在对DS、ES、SS和SP进行调整。
 	mov	%ax, %ds
 	mov	%ax, %es
 # put stack at 0x9ff00.
 	mov	%ax, %ss
 	mov	$0xFF00, %sp		# arbitrary value >>512
+
 
 # load the setup-sectors directly after the bootblock.
 # Note that 'es' is already set up.
