@@ -250,7 +250,7 @@ sectors:
 
 msg1:
 	.byte 13,10
-	.ascii "Loading imisko ..."
+	.ascii "Loading callko ..."
 	.byte 13,10,13,10
 
 	.org 508
