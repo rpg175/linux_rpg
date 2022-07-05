@@ -10,13 +10,18 @@
  * NOTE!!! Startup happens at absolute address 0x00000000, which is also where
  * the page directory will exist. The startup code will be overwritten by
  * the page directory.
+ * head程序除了做一些调用main的准备工作之外，
+ * 还做了一件对内核程序在内存中的布局及内核程序的正常运行有重大意义的事，
+ * 就是用程序自身的代码在程序自身所在的内存空间创建了内核分页机制，
+ * 即在0x000000的位置创建了页目录表、页表、缓冲区、GDT、IDT，并将head程序已经执行过的代码所占内存空间覆盖。
+ * 这意味着head程序自己将自己废弃，main函数即将开始执行。
  */
 .text
 .globl idt,gdt,pg_dir,tmp_floppy_area
 pg_dir:
 .globl startup_32
 startup_32:
-	movl $0x10,%eax
+	movl $0x10,%eax  #0x10设置ds，es，fs，gs 四个段选择符的值相同。 段基址都是指向0x000000，段限长都是8 MB，特权级都是内核特权级0
 	mov %ax,%ds
 	mov %ax,%es
 	mov %ax,%fs
@@ -79,7 +84,7 @@ check_x87:
  */
 setup_idt:
 	lea ignore_int,%edx
-	movl $0x00080000,%eax
+	movl $0x00080000,%eax /*8应该看成1000，这个值在第2章初始化IDT时会用到*/
 	movw %dx,%ax		/* selector = 0x0008 = cs */
 	movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */
 
@@ -139,7 +144,7 @@ after_page_tables:
 	pushl $0
 	pushl $0
 	pushl $L6		# return address for main, if it decides to.
-	pushl $main
+	pushl $main     # head程序将L6标号和main函数入口地址压栈，栈顶为main函数地址，目的是使head程序执行完后通过ret指令就可以直接执行main函数。
 	jmp setup_paging
 L6:
 	jmp L6			# main should never return here, but
@@ -195,6 +200,8 @@ ignore_int:
  * I've tried to show which constants to change by having
  * some kind of marker at them (search for "16Mb"), but I
  * won't guarantee that's all :-( )
+ *
+ * 设置页表
  */
 .align 2
 setup_paging:

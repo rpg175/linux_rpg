@@ -110,7 +110,7 @@ is_disk1:
 	cli			# no interrupts allowed ! 
 
 # first we move the system to it's rightful place
-
+# 将位于0x10000的内核程序复制至内存地址起始位置0x00000处！
 	mov	$0x0000, %ax
 	cld			# 'direction'=0, movs moves forward
 do_move:
