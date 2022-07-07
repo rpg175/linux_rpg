@@ -26,7 +26,7 @@ startup_32:
 	mov %ax,%es
 	mov %ax,%fs
 	mov %ax,%gs
-	lss stack_start,%esp
+	lss stack_start,%esp #（intel手册）The LSS instruction can be used to load the SS and ESP registers in one operation.
 	call setup_idt
 	call setup_gdt
 	movl $0x10,%eax		# reload all the segment registers
@@ -220,12 +220,12 @@ setup_paging:
 	subl $0x1000,%eax
 	jge 1b
 	cld
-	xorl %eax,%eax		/* pg_dir is at 0x0000 */
-	movl %eax,%cr3		/* cr3 - page directory start */
+	xorl %eax,%eax		/* pg_dir is at 0x0000 */ #内存的起始位置0x0000
+	movl %eax,%cr3		/* cr3 - page directory start */ #3号32位控制寄存器，其高20位存放页目录表的基地址。
 	movl %cr0,%eax
 	orl $0x80000000,%eax
 	movl %eax,%cr0		/* set paging (PG) bit */
-	ret			/* this also flushes prefetch-queue */
+	ret			/* this also flushes prefetch-queue */  #ret。这要通过跳入main函数程序执行
 
 .align 2
 .word 0
