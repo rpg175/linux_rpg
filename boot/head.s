@@ -200,8 +200,9 @@ ignore_int:
  * I've tried to show which constants to change by having
  * some kind of marker at them (search for "16Mb"), but I
  * won't guarantee that's all :-( )
- *
+ * 开始创建分页机制
  * 设置页表
+ * 
  */
 .align 2
 setup_paging:
@@ -246,3 +247,4 @@ gdt:	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x00c0920000000fff	/* 16Mb */
 	.quad 0x0000000000000000	/* TEMPORARY - don't use */
 	.fill 252,8,0			/* space for LDT's and TSS's etc */
+

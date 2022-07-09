@@ -59,6 +59,10 @@ static unsigned char mem_map [ PAGING_PAGES ] = {0,};
 /*
  * Get physical address of first (actually last :-) free page, and mark it
  * used. If no free pages left, return 0.
+ * get_free_page()函数用于在主内存区中申请一页空闲内存页，并返回物理内存
+* 页的起始地址。它首先扫描内存页面字节图数组 mem_map[]，寻找值是 0 的字节项（对应空闲页面）。
+* 若无则返回 0 结束，表示物理内存已使用完。若找到值为 0 的字节，则将其置 1，并换算出对应空闲页
+* 面的起始地址。然后对该内存页面作清零操作，并且最后返回该空闲页面的物理内存起始地址。
  */
 unsigned long get_free_page(void)
 {
