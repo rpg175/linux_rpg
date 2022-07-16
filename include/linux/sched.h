@@ -1,7 +1,7 @@
 #ifndef _SCHED_H
 #define _SCHED_H
 
-#define NR_TASKS 64
+#define NR_TASKS 64 //0.11版本的进程数量
 #define HZ 100
 
 #define FIRST_TASK task[0]
