@@ -219,7 +219,7 @@ sys_fork:
 1:	ret
 
 hd_interrupt:
-	pushl %eax
+	pushl %eax  #文件系统的中断命令
 	pushl %ecx
 	pushl %edx
 	push %ds
