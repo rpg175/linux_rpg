@@ -340,10 +340,13 @@ void do_hd_request(void)
 		panic("unknown hd-command");
 }
 
+//代码路径：kernel/blk_dev/hd.c：
+//与rd_init类似，参看rd_init的注释
+//硬盘的初始化为进程与硬盘这种块设备进行I/O通信建立了环境基础
 void hd_init(void)
 {
-	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
-	set_intr_gate(0x2E,&hd_interrupt);
-	outb_p(inb_p(0x21)&0xfb,0x21);
-	outb(inb_p(0xA1)&0xbf,0xA1);
+	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST; //挂接do_hd_request()
+	set_intr_gate(0x2E,&hd_interrupt); //设置硬盘中断
+	outb_p(inb_p(0x21)&0xfb,0x21); //允许8259A发出中断请求
+	outb(inb_p(0xA1)&0xbf,0xA1); //允许硬盘发送中断请求
 }

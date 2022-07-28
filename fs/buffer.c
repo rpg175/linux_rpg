@@ -30,6 +30,7 @@ extern int end;
 extern void put_super(int);
 extern void invalidate_inodes(int);
 
+//end 内核代码末端的地址，就是buffer_head起始地址
 struct buffer_head * start_buffer = (struct buffer_head *) &end;
 struct buffer_head * hash_table[NR_HASH];
 static struct buffer_head * free_list;
@@ -348,6 +349,11 @@ struct buffer_head * breada(int dev,int first, ...)
 	return (NULL);
 }
 
+//从内核的末端及缓冲区的末端同时开始，方向相对增长，
+// 配对做成buffer_head，缓冲块，
+// 直到不足一对buffer_head，缓冲块，
+// buffer_head在低地址端，缓冲块在高地址
+// 2.10初始化缓冲区管理结构
 void buffer_init(long buffer_end)
 {
 	struct buffer_head * h = start_buffer;
@@ -365,20 +371,23 @@ void buffer_init(long buffer_end)
 		h->b_lock = 0;
 		h->b_uptodate = 0;
 		h->b_wait = NULL;
-		h->b_next = NULL;
+		h->b_next = NULL; //这两项初始化为空，后续的使用将与hash_table进行挂接
 		h->b_prev = NULL;
-		h->b_data = (char *) b;
-		h->b_prev_free = h-1;
+		h->b_data = (char *) b; //每个buffer_head关联一个缓冲块
+		h->b_prev_free = h-1;   //这两项使buffer_head分别与前后buffer_head挂接，形成双向链表
 		h->b_next_free = h+1;
 		h++;
 		NR_BUFFERS++;
-		if (b == (void *) 0x100000)
-			b = (void *) 0xA0000;
+        //避开ROMBIOS＆VGA
+		if (b == (void *) 0x100000) {
+            b = (void *) 0xA0000;
+        }
 	}
 	h--;
-	free_list = start_buffer;
-	free_list->b_prev_free = h;
-	h->b_next_free = free_list;
+	free_list = start_buffer;    // free_list指向第一个buffer_hea
+	free_list->b_prev_free = h;  // 使buffer_end双向链表
+	h->b_next_free = free_list;  // 形成双向链表
+    //清空hash_table[307]为什么是307
 	for (i=0;i<NR_HASH;i++)
 		hash_table[i]=NULL;
 }	
