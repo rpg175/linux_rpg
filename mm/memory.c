@@ -68,9 +68,9 @@ unsigned long get_free_page(void)
 {
 register unsigned long __res asm("ax");
 
-__asm__("std ; repne ; scasb\n\t"
-	"jne 1f\n\t"
-	"movb $1,1(%%edi)\n\t"
+__asm__("std ; repne ; scasb\n\t" // 反向扫描串（mem map[]），al（0）与di不等则重复（找引用对数为0的项）
+	"jne 1f\n\t" /*找不到空闲页，跳转到1*/
+	"movb $1,1(%%edi)\n\t"  /*将1赋给edi+1的位置，在mem_map[]中，将找到0项的引用计数置为1*/
 	"sall $12,%%ecx\n\t"
 	"addl %2,%%ecx\n\t"
 	"movl %%ecx,%%edx\n\t"
