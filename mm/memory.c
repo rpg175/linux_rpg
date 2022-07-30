@@ -159,8 +159,19 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 	unsigned long * from_dir, * to_dir;
 	unsigned long nr;
 
+    /* 0x3fffff是4 MB，是一个页表的管辖范围，二进制是22个1，
+     * ||的两边必须同为0，所以，from和to后22位必须都为0，
+     * 即4 MB的整数倍，意思是一个页表对应4 MB连续的线性地址空间必须
+     * 是从0x000000开始的4 MB的整数倍的线性地址，
+     * 不能是任意地址开始的4 MB，才符合分页的要求*/
 	if ((from&0x3fffff) || (to&0x3fffff))
 		panic("copy_page_tables called with wrong alignment");
+    /* 一个页目录项的管理范围是4 MB，一项是4字节，项的地址就是项数×4，
+     * 也就是项管理的线性地址起始地址的M数，
+     * 比如：0项的地址是0，管理范围是0～4 MB，1项的地址是4，管理范围是
+     * 4～8 MB，2项的地址是8，管理范围是8～12MB……＞＞20就是地址的MB数，
+     * ＆0xffc就是＆111111111100b，就是4 MB以下部分清零的地址的MB数，也
+     * 就是页目录项的地*/
 	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
 	size = ((unsigned) (size+0x3fffff)) >> 22;
@@ -169,26 +180,30 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 			panic("copy_page_tables: already exist");
 		if (!(1 & *from_dir))
 			continue;
+        //*from_dir是页目录项中的地址，0xfffff000＆是将低12位清零，高20位是页表的地址
 		from_page_table = (unsigned long *) (0xfffff000 & *from_dir);
 		if (!(to_page_table = (unsigned long *) get_free_page()))
 			return -1;	/* Out of memory, see freeing */
-		*to_dir = ((unsigned long) to_page_table) | 7;
-		nr = (from==0)?0xA0:1024;
+		*to_dir = ((unsigned long) to_page_table) | 7;//7即11
+		nr = (from==0)?0xA0:1024;//0xA0即160，复制页表的项数
 		for ( ; nr-- > 0 ; from_page_table++,to_page_table++) {
+            //复制父进程页表
 			this_page = *from_page_table;
 			if (!(1 & this_page))
 				continue;
+            //设置页表项属性，2是010，～2是101，代表用户、只读、存在
 			this_page &= ~2;
 			*to_page_table = this_page;
+            //1MB以内的内核区不参与用户分页管理
 			if (this_page > LOW_MEM) {
 				*from_page_table = this_page;
 				this_page -= LOW_MEM;
 				this_page >>= 12;
-				mem_map[this_page]++;
+				mem_map[this_page]++; //增加引用计数，参看mem_init
 			}
 		}
 	}
-	invalidate();
+	invalidate(); //用重置CR3为0，刷新"页变换高速缓存"
 	return 0;
 }
 
