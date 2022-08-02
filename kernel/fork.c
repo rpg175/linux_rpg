@@ -172,9 +172,9 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
     // 任务nr的TSS描述符项在全局表中的地址。因为每个任务占用GDT表中2项，因此上式中
     // 要包括'(nr<<1)'.程序然后把新进程设置成就绪态。另外在任务切换时，任务寄存器tr由
     // CPU自动加载。最后返回新进程号。
-    set_tss_desc(gdt+(nr<<1)+FIRST_TSS_ENTRY,&(p->tss));
+    set_tss_desc(gdt+(nr<<1)+FIRST_TSS_ENTRY,&(p->tss)); //设置GDT中与子进程相关的项，看sched.c
     set_ldt_desc(gdt+(nr<<1)+FIRST_LDT_ENTRY,&(p->ldt));
-    p->state = TASK_RUNNING;	/* do this last, just in case */
+    p->state = TASK_RUNNING;	/* do this last, just in case 设置子进程为就绪 */
     return last_pid;
 }
 // 为新进程取得不重复的进程号last_pid.函数返回在task数组中的数组下标。

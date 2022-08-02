@@ -215,8 +215,8 @@ sys_fork:
 	pushl %ebp
 	pushl %eax
 	call copy_process
-	addl $20,%esp
-1:	ret
+	addl $20,%esp #/*copy_process返回至此，esp+=20就是esp清20字节的栈，也就是清前面压的gs、esi*/
+1:	ret #/*edi、ebp、eax，注意：内核栈里还有数据。返回_system_call中的pushl%eax执行*/
 
 hd_interrupt:
 	pushl %eax  #文件系统的中断命令

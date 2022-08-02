@@ -183,6 +183,8 @@ static struct buffer_head * find_buffer(int dev, int block)
  * something might happen to it while we sleep (ie a read-error
  * will force it bad). This shouldn't really happen currently, but
  * the code is ready.
+ *
+ * 调用find_buffer()函数查找缓冲区中是否有指定的设备号，块号的缓冲块，如果有就直接用
  */
 struct buffer_head * get_hash_table(int dev, int block)
 {
@@ -205,7 +207,14 @@ struct buffer_head * get_hash_table(int dev, int block)
  * so it should be much more efficient than it looks.
  *
  * The algoritm is changed: hopefully better, and an elusive bug removed.
+ *
+ * 先调用get_hash_table()函数查找哈希表，
+ * 检索此前是否有程序把现在要读的硬盘逻辑块（相同的设备号和块号）已经读到缓冲区。
+ * 如果已经读到缓冲区，那就不需要再费劲从硬盘上读取，直接用现成的。
+ * 使用哈希表进行查询的目的是提高查询速度。
+ *
  */
+//第一次调用时，b_dirt、b_lock是0，BADNESS（bh）就是00
 #define BADNESS(bh) (((bh)->b_dirt<<1)+(bh)->b_lock)
 struct buffer_head * getblk(int dev,int block)
 {
