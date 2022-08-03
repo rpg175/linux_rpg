@@ -225,23 +225,23 @@ repeat:
 		return bh;
 	tmp = free_list;
 	do {
-		if (tmp->b_count)
+		if (tmp->b_count) //第一次b_count为0
 			continue;
-		if (!bh || BADNESS(tmp)<BADNESS(bh)) {
+		if (!bh || BADNESS(tmp)<BADNESS(bh)) { //第一次bh为0
 			bh = tmp;
-			if (!BADNESS(tmp))
+			if (!BADNESS(tmp)) //第一次BADNESS(tmp)是00，取得空闲的缓冲块！
 				break;
 		}
 /* and repeat until we find something good */
 	} while ((tmp = tmp->b_next_free) != free_list);
-	if (!bh) {
+	if (!bh) { //第一次，bh在do_while中已经取得了bh
 		sleep_on(&buffer_wait);
 		goto repeat;
 	}
-	wait_on_buffer(bh);
-	if (bh->b_count)
+	wait_on_buffer(bh); //缓冲块没有加锁
+	if (bh->b_count) //第一次缓冲块计数为0
 		goto repeat;
-	while (bh->b_dirt) {
+	while (bh->b_dirt) { //第一次缓冲块的内容没有被修改
 		sync_dev(bh->b_dev);
 		wait_on_buffer(bh);
 		if (bh->b_count)
@@ -249,11 +249,12 @@ repeat:
 	}
 /* NOTE!! While we slept waiting for this block, somebody else might */
 /* already have added "this" block to the cache. check it */
-	if (find_buffer(dev,block))
+	if (find_buffer(dev,block)) //第一次虽然获得了空闲缓冲块，但并没有挂接到hash表中
 		goto repeat;
 /* OK, FINALLY we know that this buffer is the only one of it's kind, */
 /* and that it's unused (b_count=0), unlocked (b_lock=0), and clean */
-	bh->b_count=1;
+    //将取得的缓冲块，进行初始化设置，并将这个空闲的缓冲块挂载到hash_tabel上。
+	bh->b_count=1; //引用计数加1
 	bh->b_dirt=0;
 	bh->b_uptodate=0;
 	remove_from_queues(bh);
@@ -283,7 +284,7 @@ struct buffer_head * bread(int dev,int block)
 
 	if (!(bh=getblk(dev,block)))
 		panic("bread: getblk returned NULL\n");
-	if (bh->b_uptodate)
+	if (bh->b_uptodate) //第一次申请的缓冲区肯定没有更新过
 		return bh;
 	ll_rw_block(READ,bh);
 	wait_on_buffer(bh);

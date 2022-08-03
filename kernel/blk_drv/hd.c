@@ -177,9 +177,10 @@ static int win_result(void)
 	return (1);
 }
 
+//进入hd_out（）函数中去执行读盘的最后一步：下达读盘指令
 static void hd_out(unsigned int drive,unsigned int nsect,unsigned int sect,
 		unsigned int head,unsigned int cyl,unsigned int cmd,
-		void (*intr_addr)(void))
+		void (*intr_addr)(void)) //对比调用的传参WIN_READ，＆read_intr
 {
 	register int port asm("dx");
 
@@ -187,7 +188,7 @@ static void hd_out(unsigned int drive,unsigned int nsect,unsigned int sect,
 		panic("Trying to write bad sector");
 	if (!controller_ready())
 		panic("HD controller not ready");
-	do_hd = intr_addr;
+	do_hd = intr_addr;//根据调用的实参决定是read_intr还是write_intr，第一次是read_intr
 	outb_p(hd_info[drive].ctl,HD_CMD);
 	port=HD_DATA;
 	outb_p(hd_info[drive].wpcom>>2,++port);
@@ -291,6 +292,7 @@ static void recal_intr(void)
 	do_hd_request();
 }
 
+//进入do_hd_request（）函数去执行，为读盘做最后准备工作。
 void do_hd_request(void)
 {
 	int i,r = 0;
@@ -314,19 +316,21 @@ void do_hd_request(void)
 	sec++;
 	nsect = CURRENT->nr_sectors;
 	if (reset) {
-		reset = 0;
-		recalibrate = 1;
-		reset_hd(CURRENT_DEV);
+		reset = 0; //置位，防止多次执行if(reset)
+		recalibrate = 1; //置位，确保执行下面的if
+		reset_hd(CURRENT_DEV); //将通过调用hd_out向硬盘发送WIN_SPECIFY，
+                                   // 建立硬盘读盘必要的参数
 		return;
 	}
 	if (recalibrate) {
-		recalibrate = 0;
+		recalibrate = 0; //置位，防止多次执行if(recalibrate)
 		hd_out(dev,hd_info[CURRENT_DEV].sect,0,0,0,
-			WIN_RESTORE,&recal_intr);
+			WIN_RESTORE,&recal_intr); //将向硬盘发送WIN_RESTORE命令，将磁头移动到0柱面，以便从硬盘上读取数据
 		return;
 	}	
 	if (CURRENT->cmd == WRITE) {
-		hd_out(dev,nsect,sec,head,cyl,WIN_WRITE,&write_intr);
+		hd_out(dev,nsect,sec,head,cyl,WIN_WRITE,&write_intr); //注意这两个参数
+        //进入hd_out（）函数中去执行读盘的最后一步：下达读盘指令
 		for(i=0 ; i<3000 && !(r=inb_p(HD_STATUS)&DRQ_STAT) ; i++)
 			/* nothing */ ;
 		if (!r) {
