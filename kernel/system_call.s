@@ -219,7 +219,7 @@ sys_fork:
 1:	ret #/*edi、ebp、eax，注意：内核栈里还有数据。返回_system_call中的pushl%eax执行*/
 
 hd_interrupt:
-	pushl %eax  #文件系统的中断命令
+	pushl %eax  #文件系统的中断命令,保存CPU的状态
 	pushl %ecx
 	pushl %edx
 	push %ds

@@ -40,7 +40,7 @@ int NR_BUFFERS = 0;
 static inline void wait_on_buffer(struct buffer_head * bh)
 {
 	cli();
-	while (bh->b_lock)
+	while (bh->b_lock) //前面已经加锁
 		sleep_on(&bh->b_wait);
 	sti();
 }
@@ -287,7 +287,7 @@ struct buffer_head * bread(int dev,int block)
 	if (bh->b_uptodate) //第一次申请的缓冲区肯定没有更新过
 		return bh;
 	ll_rw_block(READ,bh);
-	wait_on_buffer(bh);
+	wait_on_buffer(bh); //将等待缓冲块解锁的进程挂起
 	if (bh->b_uptodate)
 		return bh;
 	brelse(bh);

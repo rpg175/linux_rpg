@@ -124,6 +124,8 @@ void schedule(void)
 	while (1) {
 		c = -1;
 		next = 0;
+        //c的值将仍然是-1，所以next仍然是0，这个next就是要切换到进程的进程号。
+        // 可以看出，如果没有合适的进程，next的数值将永远是0，就会切换到进程0去执行
 		i = NR_TASKS;
 		p = &task[NR_TASKS];
 		while (--i) {
@@ -138,6 +140,7 @@ void schedule(void)
 				(*p)->counter = ((*p)->counter >> 1) +
 						(*p)->priority;
 	}
+    //找不到可以执行的进程，next为0，即执行进程0，0特权级
 	switch_to(next);
 }
 
@@ -158,8 +161,11 @@ void sleep_on(struct task_struct **p)
 		panic("task[0] trying to sleep");
 	tmp = *p;
 	*p = current;
-	current->state = TASK_UNINTERRUPTIBLE;
-	schedule();
+	current->state = TASK_UNINTERRUPTIBLE; //将进程1设置为不可中断等待状态
+	schedule(); //调度函数，准备进程切换
+                //常规的进程切换条件是：就绪态。
+                //当前进程0：可中断等待状态，进程1：不可中断等待状态
+                //linus：强行切换到进程0！
 	if (tmp)
 		tmp->state=0;
 }
@@ -188,7 +194,7 @@ repeat:	current->state = TASK_INTERRUPTIBLE;
 void wake_up(struct task_struct **p)
 {
 	if (p && *p) {
-		(**p).state=0;
+		(**p).state=0; //设置为就绪态
 		*p=NULL;
 	}
 }

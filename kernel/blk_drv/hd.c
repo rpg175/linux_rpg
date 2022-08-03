@@ -54,8 +54,8 @@ static int NR_HD = 0;
 #endif
 
 static struct hd_struct {
-	long start_sect;
-	long nr_sects;
+	long start_sect; //起始扇区号
+	long nr_sects;   //总扇区数
 } hd[5*MAX_HD]={{0,0},};
 
 #define port_read(port,buf,nr) \
@@ -76,24 +76,26 @@ int sys_setup(void * BIOS)
 	struct partition *p;
 	struct buffer_head * bh;
 
-	if (!callable)
+	if (!callable) //控制只能调用一次
 		return -1;
 	callable = 0;
 #ifndef HD_TYPE
-	for (drive=0 ; drive<2 ; drive++) {
-		hd_info[drive].cyl = *(unsigned short *) BIOS;
-		hd_info[drive].head = *(unsigned char *) (2+BIOS);
+	for (drive=0 ; drive<2 ; drive++) { //读取drive_info设置hd_info
+		hd_info[drive].cyl = *(unsigned short *) BIOS; //柱面数
+		hd_info[drive].head = *(unsigned char *) (2+BIOS); //磁头数
 		hd_info[drive].wpcom = *(unsigned short *) (5+BIOS);
 		hd_info[drive].ctl = *(unsigned char *) (8+BIOS);
 		hd_info[drive].lzone = *(unsigned short *) (12+BIOS);
-		hd_info[drive].sect = *(unsigned char *) (14+BIOS);
+		hd_info[drive].sect = *(unsigned char *) (14+BIOS); //每磁道扇区数
 		BIOS += 16;
 	}
-	if (hd_info[1].cyl)
+	if (hd_info[1].cyl) //判断有几个硬盘
 		NR_HD=2;
 	else
 		NR_HD=1;
 #endif
+    //一个物理硬盘最多可以分4个逻辑盘，0是物理盘，1～4是逻辑盘，
+    // 共5个，第1个物理盘是0*5，第2个物理盘是1*
 	for (i=0 ; i<NR_HD ; i++) {
 		hd[i*5].start_sect = 0;
 		hd[i*5].nr_sects = hd_info[i].head*
@@ -133,23 +135,50 @@ int sys_setup(void * BIOS)
 		hd[i*5].start_sect = 0;
 		hd[i*5].nr_sects = 0;
 	}
+
+    //第1个物理盘设备号是0x300，第2个是0x305，读每个物理硬盘的0号块，即引导块，有分区
 	for (drive=0 ; drive<NR_HD ; drive++) {
+        //进程1：
+        // 1.读取硬盘的引导块到缓冲区：进入bread()后，调用getblk(),申请一个新空闲的缓冲块；
+        // 在getblk()函数中，先调用get_hash_table()查找哈希表，检查此前是否有程序吧要读的硬盘逻辑块读到缓冲区。如果已经读了，无需再读。
+        // 进入get_hash_table函数后，调用find_buffer查找缓冲区是否有指定的设备号，块号的缓冲块。第一次返回null，退出find_buffer,退出get_hash_table,
+        // 返回到getblk()，在free_list中心申请新的缓冲块，然后进行初始化设置，并挂接到hash_table中,挂接过程比较复杂（remove_from_queues,insert_into_queues），
+        // 挂接hash_table完成后，就执行完了getblk()，返回到bread()，
+        // 在bread函数中，调用ll_rw_block()这个函数，将缓冲块与请求项结构进行挂接：调用make_request()，注意：make_request需要先将缓冲块加锁
+        // 目的是保护这个缓冲块在解锁之前将不再被任何进程操作，lock_buffer(),初始化request完成后，调用add_request()向请求项队列中加载该请求项。
+        // 对当前硬盘工作进行分析，然后设置请求项为当前请求项，并调用硬盘处理函数(dev->request_fn),即do_hd_request给硬盘发送读盘命令。
+        // 发送读盘命令（使用电梯算法让磁盘的移动距离最小）hd_out()，注意hd_out函数的win_read,read_intr的两个参数，
+        // 当前为读命令，所以是read_intr，硬盘开始读的时候，程序调用结束返回：hd_out,do_hd_request,add_request,make_request,ll_rw_block
+        // 一直到bread()，硬盘数据还没有读完，调用wait_on_buffer，因为锁还没释放，调用sleep_on，挂起等待！
+        // 进程1当前状态为：不可中断等待状态。调用schedule()函数，切换到进程0，进程0进行怠速运行。硬盘继续读扇区数据，某个时刻硬盘数据读完，产生硬盘中断。
+        // CPU接到中断指令后，终止正在执行的程序，开始执行中断服务代码即read_intr，read_intr将硬盘缓存复制到锁定的缓冲块中。
+        // 引导块的数据是1024，当前只读了一半数据512，需要继续读。这个时候进程1仍处在被挂起状态，
+        // pause（）、sys_pause（）、schedule（）、switch_to（0）循环从刚才硬盘中断打断的地方继续循环，硬盘继续读盘……
+        // 某个时刻硬盘数据读完，产生硬盘中断。再次进入read_intr函数后，此时数据已经读完，跳转到end_request()
+        // end_request中，数据已经全部读取完成，更新标准b_uptodata为1。
+
+        // 2.硬盘数据被加载到内存后，调用unlock_buffer()->wake_up()函数将进程1设置为就绪态，
+        // 由schedule函数调用switch_to切换进程1执行ljmp %0切走CPU执行流,
+        // 返回切换者（进程1）sleep_on()函数，最终返回到bread()函数，此时b_uptodata为1，函数执行完毕。
+        // 7.读盘操作完成后，进程调度切换到进程1执行
 		if (!(bh = bread(0x300 + drive*5,0))) {
 			printk("Unable to read partition table of drive %d\n\r",
 				drive);
 			panic("");
 		}
+        //如果扇区的最后2字节不是'55AA',表示数据无效。
 		if (bh->b_data[510] != 0x55 || (unsigned char)
 		    bh->b_data[511] != 0xAA) {
 			printk("Bad partition table on drive %d\n\r",drive);
 			panic("");
 		}
+        //读取的数据是有效的，根据引导块中的分区信息设置hd[]
 		p = 0x1BE + (void *)bh->b_data;
 		for (i=1;i<5;i++,p++) {
 			hd[i+5*drive].start_sect = p->start_sect;
 			hd[i+5*drive].nr_sects = p->nr_sects;
 		}
-		brelse(bh);
+		brelse(bh); //释放缓冲区（引用计数减1）
 	}
 	if (NR_HD)
 		printk("Partition table%s ok.\n\r",(NR_HD>1)?"s":"");
@@ -189,6 +218,9 @@ static void hd_out(unsigned int drive,unsigned int nsect,unsigned int sect,
 	if (!controller_ready())
 		panic("HD controller not ready");
 	do_hd = intr_addr;//根据调用的实参决定是read_intr还是write_intr，第一次是read_intr
+                      //把读盘服务程序与硬盘中断操作程序相挂接
+                      //这里面的do_hd是system_call.s中_hd_interrupt下面xchgl_do_hd，%edx这一行所描述的内容。
+                      //现在要做读盘操作，所以挂接的就是实参read_intr，如果是写盘，挂接的就应该是write_intr（）函数。
 	outb_p(hd_info[drive].ctl,HD_CMD);
 	port=HD_DATA;
 	outb_p(hd_info[drive].wpcom>>2,++port);
@@ -248,6 +280,9 @@ static void bad_rw_intr(void)
 		reset = 1;
 }
 
+//read_intr（）函数会将已经读到硬盘缓存中的数据复制到刚才被锁定的那个缓冲块中
+// （注意：锁定是阻止进程方面的操作，而不是阻止外设方面的操作），
+// 这时1个扇区256字（512字节）的数据读入前面申请到的缓冲块，如图3-27中的第二步所示。执行代码如下
 static void read_intr(void)
 {
 	if (win_result()) {
@@ -260,9 +295,12 @@ static void read_intr(void)
 	CURRENT->buffer += 512;
 	CURRENT->sector++;
 	if (--CURRENT->nr_sectors) {
+        //引导块的数据是1024字节，
+        //请求项要求的也是1024字节，如果没有读完1024，硬盘会继续读盘
 		do_hd = &read_intr;
 		return;
 	}
+    //请求项要求的数据量(1024)全部读完了，执行end_request
 	end_request(1);
 	do_hd_request();
 }
