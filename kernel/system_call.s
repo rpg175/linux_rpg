@@ -106,7 +106,7 @@ ret_from_sys_call:
 	jne 3f
 	cmpw $0x17,OLDSS(%esp)		# was stack segment = 0x17 ?
 	jne 3f
-	movl signal(%eax),%ebx
+	movl signal(%eax),%ebx   #下面是取信号位图……
 	movl blocked(%eax),%ecx
 	notl %ecx
 	andl %ebx,%ecx
@@ -116,7 +116,7 @@ ret_from_sys_call:
 	movl %ebx,signal(%eax)
 	incl %ecx
 	pushl %ecx
-	call do_signal
+	call do_signal  #调用do_signal（）
 	popl %eax
 3:	popl %eax
 	popl %ebx

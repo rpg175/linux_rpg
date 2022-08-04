@@ -155,7 +155,7 @@ int sys_setup(void * BIOS)
         // 引导块的数据是1024，当前只读了一半数据512，需要继续读。这个时候进程1仍处在被挂起状态，
         // pause（）、sys_pause（）、schedule（）、switch_to（0）循环从刚才硬盘中断打断的地方继续循环，硬盘继续读盘……
         // 某个时刻硬盘数据读完，产生硬盘中断。再次进入read_intr函数后，此时数据已经读完，跳转到end_request()
-        // end_request中，数据已经全部读取完成，更新标准b_uptodata为1。
+        // end_request中，数据已经全部读取完成，更新标志位b_uptodata为1。
 
         // 2.硬盘数据被加载到内存后，调用unlock_buffer()->wake_up()函数将进程1设置为就绪态，
         // 由schedule函数调用switch_to切换进程1执行ljmp %0切走CPU执行流,
@@ -178,12 +178,12 @@ int sys_setup(void * BIOS)
 			hd[i+5*drive].start_sect = p->start_sect;
 			hd[i+5*drive].nr_sects = p->nr_sects;
 		}
-		brelse(bh); //释放缓冲区（引用计数减1）
+		brelse(bh); //释放缓冲区（引用计数减1
 	}
 	if (NR_HD)
 		printk("Partition table%s ok.\n\r",(NR_HD>1)?"s":"");
-	rd_load();
-	mount_root();
+	rd_load(); //格式化虚拟盘，设置为根设备
+	mount_root(); //根设备虚拟盘，加载根文件系统，sys_setup()函数执行完毕，返回到system_call中执行，执行下一条指令
 	return (0);
 }
 

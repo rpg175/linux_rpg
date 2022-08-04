@@ -247,25 +247,28 @@ struct m_inode * iget(int dev,int nr)
 
 	if (!dev)
 		panic("iget with dev==0");
+    //从inode_table[32]中申请一个空闲的inode位置，倒霉蛋拿到的是第一个inode_table[0]
 	empty = get_empty_inode();
 	inode = inode_table;
-	while (inode < NR_INODE+inode_table) {
+	while (inode < NR_INODE+inode_table) { //查找与参数dev，nr相同的inode
 		if (inode->i_dev != dev || inode->i_num != nr) {
 			inode++;
 			continue;
 		}
-		wait_on_inode(inode);
-		if (inode->i_dev != dev || inode->i_num != nr) {
+		wait_on_inode(inode); //找到相同的inode，等待解锁
+		if (inode->i_dev != dev || inode->i_num != nr) { //解锁后发现inode和参数要求不匹配，需要再次遍历查找
 			inode = inode_table;
 			continue;
 		}
+
 		inode->i_count++;
 		if (inode->i_mount) {
 			int i;
-
+            //如果是mount，则查找对应的超级块
 			for (i = 0 ; i<NR_SUPER ; i++)
 				if (super_block[i].s_imount==inode)
 					break;
+
 			if (i >= NR_SUPER) {
 				printk("Mounted inode hasn't got sb\n");
 				if (empty)
@@ -273,8 +276,8 @@ struct m_inode * iget(int dev,int nr)
 				return inode;
 			}
 			iput(inode);
-			dev = super_block[i].s_dev;
-			nr = ROOT_INO;
+			dev = super_block[i].s_dev; //从超级块中获取设备号
+			nr = ROOT_INO; //ROOT_INO为1，根inode
 			inode = inode_table;
 			continue;
 		}
@@ -285,9 +288,9 @@ struct m_inode * iget(int dev,int nr)
 	if (!empty)
 		return (NULL);
 	inode=empty;
-	inode->i_dev = dev;
+	inode->i_dev = dev; //初始化
 	inode->i_num = nr;
-	read_inode(inode);
+	read_inode(inode); //从虚拟盘上读出根inode
 	return inode;
 }
 
@@ -296,18 +299,22 @@ static void read_inode(struct m_inode * inode)
 	struct super_block * sb;
 	struct buffer_head * bh;
 	int block;
-
+    //给参数inode加锁
 	lock_inode(inode);
 	if (!(sb=get_super(inode->i_dev)))
 		panic("trying to read inode without dev");
-	block = 2 + sb->s_imap_blocks + sb->s_zmap_blocks +
+	//通过inode所在的超级块，计算出inode所在的逻辑块号
+    block = 2 + sb->s_imap_blocks + sb->s_zmap_blocks +
 		(inode->i_num-1)/INODES_PER_BLOCK;
+    //将inode所在的逻辑块整体读出，从中提取inode的信息，载入刚才加锁的inode位置上
 	if (!(bh=bread(inode->i_dev,block)))
 		panic("unable to read i-node block");
 	*(struct d_inode *)inode =
 		((struct d_inode *)bh->b_data)
 			[(inode->i_num-1)%INODES_PER_BLOCK];
+    //释放缓冲块
 	brelse(bh);
+    //解锁inode
 	unlock_inode(inode);
 }
 
