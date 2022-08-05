@@ -224,46 +224,62 @@ static struct buffer_head * add_entry(struct m_inode * dir,
  *
  * Getdir traverses the pathname until it hits the topmost directory.
  * It returns NULL on failure.
+ *
+ * @pathname pathname就是路径/dev/tty0的指针
  */
 static struct m_inode * get_dir(const char * pathname)
 {
 	char c;
-	const char * thisname;
+	const char * thisname; //thisname记录目录项名字前面'/'的地址
 	struct m_inode * inode;
 	struct buffer_head * bh;
-	int namelen,inr,idev;
-	struct dir_entry * de;
+	int namelen,inr,idev;//namelen记录名字的长度
+	struct dir_entry * de; //de用来指向目录项内容
 
+    //当前进程的根i节点不存在或引用计数为0，死机
 	if (!current->root || !current->root->i_count)
 		panic("No root inode");
+
+    //当前进程的当前工作目录根i节点不存在或引用计数为0，死机
 	if (!current->pwd || !current->pwd->i_count)
 		panic("No cwd inode");
+
+    //此处识别出"/dev/tty0"这个路径的第一个字符是'/'
 	if ((c=get_fs_byte(pathname))=='/') {
 		inode = current->root;
-		pathname++;
+		pathname++; //pathname原本是/dev/tty0这个字符串中第一个字符的指针，即指向'/'，++后指向'd'
 	} else if (c)
 		inode = current->pwd;
 	else
 		return NULL;	/* empty name is bad */
-	inode->i_count++;
-	while (1) {
-		thisname = pathname;
+	inode->i_count++; //该i节点的引用计数也随之加1
+
+	while (1) { //循环以下过程，直到找到枝梢i节点为止
+		thisname = pathname; //thisname也会指向'd'
 		if (!S_ISDIR(inode->i_mode) || !permission(inode,MAY_EXEC)) {
 			iput(inode);
 			return NULL;
 		}
+
+        //每当检索到字符串中的'/'字符，或者c为'\0'，循环都会跳出
 		for(namelen=0;(c=get_fs_byte(pathname++))&&(c!='/');namelen++)
 			/* nothing */ ;
 		if (!c)
 			return inode;
+
+        //通过目录文件的i节点和目录项信息，获取目录项
 		if (!(bh = find_entry(&inode,thisname,namelen,&de))) {
+            //de会指向dev目录项
 			iput(inode);
 			return NULL;
 		}
+        //通过目录项找到i节点号
 		inr = de->inode;
+        //注意，这个inode是根i节点，这里通过根i节点找到设备号
 		idev = inode->i_dev;
 		brelse(bh);
 		iput(inode);
+        //将dev目录文件的i节点保存在inode_table[32]的指定表项内并将该表项指针返回
 		if (!(inode = iget(idev,inr)))
 			return NULL;
 	}
@@ -274,6 +290,8 @@ static struct m_inode * get_dir(const char * pathname)
  *
  * dir_namei() returns the inode of the directory of the
  * specified name, and the name within that directory.
+ *
+ * @pathname 就是路径/dev/tty0的指针
  */
 static struct m_inode * dir_namei(const char * pathname,
 	int * namelen, const char ** name)
@@ -282,14 +300,14 @@ static struct m_inode * dir_namei(const char * pathname,
 	const char * basename;
 	struct m_inode * dir;
 
-	if (!(dir = get_dir(pathname)))
+	if (!(dir = get_dir(pathname))) //获取i节点的执行函数
 		return NULL;
 	basename = pathname;
-	while ((c=get_fs_byte(pathname++)))
+	while ((c=get_fs_byte(pathname++))) //逐个遍历/dev/tty0字符串，每次循环都将一个字符复制给c，直到字符串结束
 		if (c=='/')
 			basename=pathname;
-	*namelen = pathname-basename-1;
-	*name = basename;
+	*namelen = pathname-basename-1; //确定tty0名字的长
+	*name = basename; //得到tty0前面'/'字符的地址
 	return dir;
 }
 
@@ -333,21 +351,23 @@ struct m_inode * namei(const char * pathname)
  *	open_namei()
  *
  * namei for open - this is in fact almost the whole open-routine.
+ *
+ * @pathname 就是路径/dev/tty0的指针
  */
 int open_namei(const char * pathname, int flag, int mode,
 	struct m_inode ** res_inode)
 {
-	const char * basename;
-	int inr,dev,namelen;
+	const char * basename; //basename记录目录项名字前面'/'的地址
+	int inr,dev,namelen; //namelen记录名字的长度
 	struct m_inode * dir, *inode;
 	struct buffer_head * bh;
-	struct dir_entry * de;
+	struct dir_entry * de; //de用来指向目录项内容
 
 	if ((flag & O_TRUNC) && !(flag & O_ACCMODE))
 		flag |= O_WRONLY;
 	mode &= 0777 & ~current->umask;
 	mode |= I_REGULAR;
-	if (!(dir = dir_namei(pathname,&namelen,&basename)))
+	if (!(dir = dir_namei(pathname,&namelen,&basename))) //获取枝梢i节点
 		return -ENOENT;
 	if (!namelen) {			/* special case: '/usr/' etc */
 		if (!(flag & (O_ACCMODE|O_CREAT|O_TRUNC))) {
@@ -357,7 +377,10 @@ int open_namei(const char * pathname, int flag, int mode,
 		iput(dir);
 		return -EISDIR;
 	}
+    //通过枝梢i节点，找到目标文件的目录项
 	bh = find_entry(&dir,basename,namelen,&de);
+
+    //tty0目录项找到了，缓冲块不可能为空，if中此时不会执行
 	if (!bh) {
 		if (!(flag & O_CREAT)) {
 			iput(dir);
@@ -389,15 +412,19 @@ int open_namei(const char * pathname, int flag, int mode,
 		*res_inode = inode;
 		return 0;
 	}
-	inr = de->inode;
-	dev = dir->i_dev;
+
+    inr = de->inode; //得到i节点号
+	dev = dir->i_dev; //得到虚拟盘的设备号
 	brelse(bh);
 	iput(dir);
 	if (flag & O_EXCL)
 		return -EEXIST;
+
+    // tty0这个文件的i节点
 	if (!(inode=iget(dev,inr)))
 		return -EACCES;
-	if ((S_ISDIR(inode->i_mode) && (flag & O_ACCMODE)) ||
+
+    if ((S_ISDIR(inode->i_mode) && (flag & O_ACCMODE)) ||
 	    !permission(inode,ACC_MODE(flag))) {
 		iput(inode);
 		return -EPERM;
@@ -405,7 +432,7 @@ int open_namei(const char * pathname, int flag, int mode,
 	inode->i_atime = CURRENT_TIME;
 	if (flag & O_TRUNC)
 		truncate(inode);
-	*res_inode = inode;
+	*res_inode = inode; //将此i节点传递给sys_open
 	return 0;
 }
 

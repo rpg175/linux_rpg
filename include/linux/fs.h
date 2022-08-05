@@ -154,9 +154,10 @@ struct d_super_block {
 	unsigned short s_magic;
 };
 
+//目录项结构
 struct dir_entry {
-	unsigned short inode;
-	char name[NAME_LEN];
+	unsigned short inode;//目录项所对应目录文件在设备上的i节点号
+	char name[NAME_LEN]; //目录项名字，14字节
 };
 
 extern struct m_inode inode_table[NR_INODE];

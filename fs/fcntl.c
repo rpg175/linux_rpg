@@ -17,17 +17,22 @@ extern int sys_close(int fd);
 
 static int dupfd(unsigned int fd, unsigned int arg)
 {
+    //检测是否具备复制文件句柄的条件
 	if (fd >= NR_OPEN || !current->filp[fd])
 		return -EBADF;
+
 	if (arg >= NR_OPEN)
 		return -EINVAL;
+
 	while (arg < NR_OPEN)
-		if (current->filp[arg])
+		if (current->filp[arg]) //在进程1的filp[20]中寻找空闲项（此时是第二项），以便复制
 			arg++;
 		else
 			break;
 	if (arg >= NR_OPEN)
 		return -EMFILE;
+
+    //复制文件句柄，建立标准输出设备，并相应增加文件引用计数，f_count为2
 	current->close_on_exec &= ~(1<<arg);
 	(current->filp[arg] = current->filp[fd])->f_count++;
 	return arg;
@@ -39,8 +44,10 @@ int sys_dup2(unsigned int oldfd, unsigned int newfd)
 	return dupfd(oldfd,newfd);
 }
 
+//dup对应的系统调用函数
 int sys_dup(unsigned int fildes)
 {
+    //执行复制句柄
 	return dupfd(fildes,0);
 }
 

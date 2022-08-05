@@ -138,6 +138,7 @@ int sys_exit(int error_code)
 	return do_exit((error_code&0xff)<<8);
 }
 
+//wait对应sys_waitpid系统调用
 int sys_waitpid(pid_t pid,unsigned long * stat_addr, int options)
 {
 	int flag, code;
@@ -149,6 +150,7 @@ repeat:
 	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p) {
 		if (!*p || *p == current)
 			continue;
+        //筛选出当前进程，即进程1的子进程，此时会是进程2
 		if ((*p)->father != current->pid)
 			continue;
 		if (pid>0) {
@@ -161,13 +163,14 @@ repeat:
 			if ((*p)->pgrp != -pid)
 				continue;
 		}
+        //判断进程2的状态
 		switch ((*p)->state) {
-			case TASK_STOPPED:
+			case TASK_STOPPED: //如果进程2是停止状态，将在这里处理
 				if (!(options & WUNTRACED))
 					continue;
 				put_fs_long(0x7f,stat_addr);
 				return (*p)->pid;
-			case TASK_ZOMBIE:
+			case TASK_ZOMBIE: //如果进程2是僵死状态，将在这里处理
 				current->cutime += (*p)->utime;
 				current->cstime += (*p)->stime;
 				flag = (*p)->pid;
@@ -175,7 +178,7 @@ repeat:
 				release(*p);
 				put_fs_long(code,stat_addr);
 				return flag;
-			default:
+			default: //此时进程2是就绪态，所以到这里去执行，将flag标志设置为1并跳出循环
 				flag=1;
 				continue;
 		}

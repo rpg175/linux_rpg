@@ -140,9 +140,9 @@ int sys_setup(void * BIOS)
 	for (drive=0 ; drive<NR_HD ; drive++) {
         //进程1：
         // 1.读取硬盘的引导块到缓冲区：进入bread()后，调用getblk(),申请一个新空闲的缓冲块；
-        // 在getblk()函数中，先调用get_hash_table()查找哈希表，检查此前是否有程序吧要读的硬盘逻辑块读到缓冲区。如果已经读了，无需再读。
+        // 在getblk()函数中，先调用get_hash_table()查找哈希表，检查此前是否有程序把要读的硬盘逻辑块读到缓冲区。如果已经读了，无需再读。
         // 进入get_hash_table函数后，调用find_buffer查找缓冲区是否有指定的设备号，块号的缓冲块。第一次返回null，退出find_buffer,退出get_hash_table,
-        // 返回到getblk()，在free_list中心申请新的缓冲块，然后进行初始化设置，并挂接到hash_table中,挂接过程比较复杂（remove_from_queues,insert_into_queues），
+        // 返回到getblk()，在free_list中重新申请新的缓冲块，然后进行初始化设置，并挂接到hash_table中,挂接过程比较复杂（remove_from_queues,insert_into_queues），
         // 挂接hash_table完成后，就执行完了getblk()，返回到bread()，
         // 在bread函数中，调用ll_rw_block()这个函数，将缓冲块与请求项结构进行挂接：调用make_request()，注意：make_request需要先将缓冲块加锁
         // 目的是保护这个缓冲块在解锁之前将不再被任何进程操作，lock_buffer(),初始化request完成后，调用add_request()向请求项队列中加载该请求项。

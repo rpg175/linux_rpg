@@ -176,23 +176,29 @@ static char * envp[] = { "HOME=/usr/root", NULL };
 void init(void)
 {
 	int pid,i;
-
+    // 进程0创建进程1，进程1为安装硬盘文件系统做准备，
+    // "格式化"虚拟盘并用虚拟盘取代软盘为根设备，
+    // 并在虚拟盘上加载根文件系统
 	setup((void *) &drive_info);
-	(void) open("/dev/tty0",O_RDWR,0);
-	(void) dup(0);
-	(void) dup(0);
-	printf("%d buffers = %d bytes buffer space\n\r",NR_BUFFERS,
-		NR_BUFFERS*BLOCK_SIZE);
+    //执行open时产生软中断，并最终映射到内核中sys_open函数去执行
+	(void) open("/dev/tty0",O_RDWR,0); //创建标准输入设备，其中/dev/tty0是该文件的路径名
+	(void) dup(0); //复制句柄，创建标准输出设备 dup（）函数最终会映射到 sys_dup（）这个系统调用函数中
+	(void) dup(0); //继续复制句柄，创建标准错误输出设备
+    //在标准输出设备支持下，显示信息
+	printf("%d buffers = %d bytes buffer space\n\r",NR_BUFFERS,NR_BUFFERS*BLOCK_SIZE);
 	printf("Free mem: %d bytes\n\r",memory_end-main_memory_start);
+
+    //if下为进程2的代码，进程1创建进程2
 	if (!(pid=fork())) {
 		close(0);
+
 		if (open("/etc/rc",O_RDONLY,0))
 			_exit(1);
 		execve("/bin/sh",argv_rc,envp_rc);
 		_exit(2);
 	}
 	if (pid>0)
-		while (pid != wait(&i))
+		while (pid != wait(&i)) //wait（）函数最终会映射到系统调用函数sys_waitpid（）中执行
 			/* nothing */;
 	while (1) {
 		if ((pid=fork())<0) {
@@ -207,8 +213,9 @@ void init(void)
 			(void) dup(0);
 			_exit(execve("/bin/sh",argv,envp));
 		}
+
 		while (1)
-			if (pid == wait(&i))
+			if (pid == wait(&i)) //进程1等待子进程退出，最终会切换到进程2执行
 				break;
 		printf("\n\rchild %d died with code %04x\n\r",pid,i);
 		sync();

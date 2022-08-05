@@ -142,28 +142,44 @@ int sys_open(const char * filename,int flag,int mode)
 	int i,fd;
 
 	mode &= 0777 & ~current->umask;
-	for(fd=0 ; fd<NR_OPEN ; fd++)
-		if (!current->filp[fd])
+    for(fd=0 ; fd<NR_OPEN ; fd++)
+		if (!current->filp[fd]) //遍历进程1的filp，直到获取一个空闲项，fd就是这个空闲项的索引
 			break;
+    //如果此条件成立，说明 filp[20] 中没有空闲项了，直接返回
 	if (fd>=NR_OPEN)
 		return -EINVAL;
 	current->close_on_exec &= ~(1<<fd);
+
+    //获取file_table[64]首地址
 	f=0+file_table;
+
+    //遍历file_table[64],直到获取到一个空闲项，f就是这个空闲项的指针
 	for (i=0 ; i<NR_FILE ; i++,f++)
 		if (!f->f_count) break;
+
+    //如果此条件成立，说明file_table[20]中没有空闲项了，直接返回
 	if (i>=NR_FILE)
 		return -EINVAL;
+
+    //将进程1的filp[20]与file_table[64]挂接，并增加引用计数
 	(current->filp[fd]=f)->f_count++;
+
+    //获取文件inode，即标准输入设备文件的inode，此时的filename就是路径/dev/tty0的指针
+    //open("/dev/tty0",O_RDWR,0);
 	if ((i=open_namei(filename,flag,mode,&inode))<0) {
 		current->filp[fd]=NULL;
 		f->f_count=0;
 		return i;
 	}
 /* ttys are somewhat special (ttyxx major==4, tty major==5) */
+    //通过检测tty0文件的i节点属性，得知它是设备文件
 	if (S_ISCHR(inode->i_mode)) {
+        //得知设备号是4
 		if (MAJOR(inode->i_zone[0])==4) {
 			if (current->leader && current->tty<0) {
+                //设置当前进程的tty号为该i节点的子设备号
 				current->tty = MINOR(inode->i_zone[0]);
+                //设置当前进程tty对应的tty表项的父进程组号为进程的父进程组号　
 				tty_table[current->tty].pgrp = current->pgrp;
 			}
 		} else if (MAJOR(inode->i_zone[0])==5)
@@ -177,11 +193,11 @@ int sys_open(const char * filename,int flag,int mode)
 /* Likewise with block-devices: check for floppy_change */
 	if (S_ISBLK(inode->i_mode))
 		check_disk_change(inode->i_zone[0]);
-	f->f_mode = inode->i_mode;
-	f->f_flags = flag;
-	f->f_count = 1;
-	f->f_inode = inode;
-	f->f_pos = 0;
+	f->f_mode = inode->i_mode; //用该i节点属性，设置文件属性
+	f->f_flags = flag; //用flag参数，设置文件标识
+	f->f_count = 1; //将文件引用计数加1
+	f->f_inode = inode; //文件与i节点建立关系
+	f->f_pos = 0; //将文件读写指针设置为0
 	return (fd);
 }
 
