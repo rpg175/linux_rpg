@@ -190,11 +190,11 @@ void init(void)
 
     //if下为进程2的代码，进程1创建进程2
 	if (!(pid=fork())) {
-		close(0);
+		close(0); //切换到进程2时，关闭标准输入设备文件
 
-		if (open("/etc/rc",O_RDONLY,0))
+		if (open("/etc/rc",O_RDONLY,0))  //用rc文件替换该设备文件
 			_exit(1);
-		execve("/bin/sh",argv_rc,envp_rc);
+		execve("/bin/sh",argv_rc,envp_rc); //加载shell程序
 		_exit(2);
 	}
 	if (pid>0)
@@ -214,8 +214,12 @@ void init(void)
 			_exit(execve("/bin/sh",argv,envp));
 		}
 
+        //进程1切换到进程2：进程1等待子进程退出，最终会切换到进程2执行
+        //wait()会被映射为sys_waitpid()执行，
+        // sys_waitpid()先要对所有的进程进行遍历：
+        // 先确定那个进程1的子进程，由于进程1刚刚创建了子进程，即进程2，于是进程2被选择中了
 		while (1)
-			if (pid == wait(&i)) //进程1等待子进程退出，最终会切换到进程2执行
+			if (pid == wait(&i))
 				break;
 		printf("\n\rchild %d died with code %04x\n\r",pid,i);
 		sync();

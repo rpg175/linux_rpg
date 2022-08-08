@@ -183,10 +183,11 @@ repeat:
 				continue;
 		}
 	}
+    //flag的标志位为1，将调用schedule()进行进程切换
 	if (flag) {
 		if (options & WNOHANG)
 			return 0;
-		current->state=TASK_INTERRUPTIBLE;
+		current->state=TASK_INTERRUPTIBLE; //当前进程1没有退出的子进程，所以将其设置为可中断等待状态
 		schedule();
 		if (!(current->signal &= ~(1<<(SIGCHLD-1))))
 			goto repeat;
