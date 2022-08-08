@@ -206,6 +206,9 @@ int sys_creat(const char * pathname, int mode)
 	return sys_open(pathname, O_CREAT | O_TRUNC, mode);
 }
 
+// 由于进程2继承了进程1的管理信息，因此其filp[20]中文件指针存储情况与进程1是一致的。
+// close（0）就是要将filp[20]第一项清空（就是关闭标准输入设备文件tty0），
+// 并递减file_table[64]中f_count的引用计数。
 int sys_close(unsigned int fd)
 {	
 	struct file * filp;
@@ -213,12 +216,12 @@ int sys_close(unsigned int fd)
 	if (fd >= NR_OPEN)
 		return -EINVAL;
 	current->close_on_exec &= ~(1<<fd);
-	if (!(filp = current->filp[fd]))
+	if (!(filp = current->filp[fd])) //获取进程2标准输入设备文件的指针
 		return -EINVAL;
-	current->filp[fd] = NULL;
+	current->filp[fd] = NULL; //进程2与该设备文件解除关系
 	if (filp->f_count == 0)
 		panic("Close: file count is 0");
-	if (--filp->f_count)
+	if (--filp->f_count) //该设备文件引用计数递减
 		return (0);
 	iput(filp->f_inode);
 	return (0);

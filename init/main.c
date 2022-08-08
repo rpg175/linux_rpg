@@ -190,11 +190,13 @@ void init(void)
 
     //if下为进程2的代码，进程1创建进程2
 	if (!(pid=fork())) {
-		close(0); //切换到进程2时，关闭标准输入设备文件
+		close(0); //切换到进程2时，关闭标准输入设备文件,close()最终会映射到sys_close()函数中执行
 
 		if (open("/etc/rc",O_RDONLY,0))  //用rc文件替换该设备文件
 			_exit(1);
-		execve("/bin/sh",argv_rc,envp_rc); //加载shell程序
+        //加载shell程序，其中/bin/sh为shell文件路径，argv_rc和envp_rc分别是参数及环境变量
+        //execve最终会映射到sys_execve执行
+		execve("/bin/sh",argv_rc,envp_rc);
 		_exit(2);
 	}
 	if (pid>0)

@@ -196,11 +196,12 @@ timer_interrupt:
 	addl $4,%esp		# task switching to accounting ...
 	jmp ret_from_sys_call
 
+#/*execve函数对应的系统调用*/
 .align 2
 sys_execve:
 	lea EIP(%esp),%eax
-	pushl %eax
-	call do_execve
+	pushl %eax             # 把EIP值“所在栈空间的地址值”压栈
+	call do_execve         # do_execve就是支持加载shell程序的主体函数
 	addl $4,%esp
 	ret
 
