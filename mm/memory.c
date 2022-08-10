@@ -223,15 +223,22 @@ unsigned long put_page(unsigned long page,unsigned long address)
 		printk("Trying to put page %p at %p\n",page,address);
 	if (mem_map[(page-LOW_MEM)>>12] != 1)
 		printk("mem_map disagrees with %p at %p\n",page,address);
+
+    //计算address在页目录表中对应的表项
 	page_table = (unsigned long *) ((address>>20) & 0xffc);
+
+    //如果该页目录想已经有对应的页表，就就获取该页表的地址
 	if ((*page_table)&1)
 		page_table = (unsigned long *) (0xfffff000 & *page_table);
 	else {
+        //申请页面来加载页表信息
 		if (!(tmp=get_free_page()))
 			return 0;
 		*page_table = tmp|7;
 		page_table = (unsigned long *) tmp;
 	}
+
+    //页面和页表建立关系，最终完成映射
 	page_table[(address>>12) & 0x3ff] = page | 7;
 /* no need for invalidate */
 	return page;
@@ -391,27 +398,39 @@ void do_no_page(unsigned long error_code,unsigned long address)
 
 	address &= 0xfffff000;
 	tmp = address - current->start_code;
+    //如果不是加载程序而是其他原因导致缺页
 	if (!current->executable || tmp >= current->end_data) {
-		get_empty_page(address);
+		get_empty_page(address); //比如说压栈没有地方了，那么直接申请页面就可以了
 		return;
 	}
+    //尝试能不能和其他进程共享程序，这样就不需要加载了，
 	if (share_page(tmp))
 		return;
+
+    //为shell程序申请一页新的内存
 	if (!(page = get_free_page()))
 		oom();
 /* remember that 1 block is used for header */
 	block = 1 + tmp/BLOCK_SIZE;
 	for (i=0 ; i<4 ; block++,i++)
 		nr[i] = bmap(current->executable,block);
+
+    //读取4个逻辑块（1页）的shell程序内容进内存页面
+    //在增加了一页内存后，该页内存的部分可以能会超过进程的end_data位置
 	bread_page(page,current->executable->i_dev,nr);
+
+    //对物理也超出部分进行处理（对齐）
 	i = tmp + 4096 - current->end_data;
 	tmp = page + 4096;
 	while (i-- > 0) {
 		tmp--;
 		*(char *)tmp = 0;
 	}
+
+    //将物理地址映射到线性地址空间
 	if (put_page(page,address))
 		return;
+
 	free_page(page);
 	oom();
 }
