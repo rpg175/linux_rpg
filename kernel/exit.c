@@ -102,15 +102,22 @@ static void tell_father(int pid)
 int do_exit(long code)
 {
 	int i;
+    //释放shell进程的代码段和数据段所占据的内存页面
 	free_page_tables(get_base(current->ldt[1]),get_limit(0x0f));
 	free_page_tables(get_base(current->ldt[2]),get_limit(0x17));
+
+    //检测shell进程是否有子进程
 	for (i=0 ; i<NR_TASKS ; i++)
+        //shell的子进程为update进程，因此shell退出的时候，将update进程的父进程设置为进程1
 		if (task[i] && task[i]->father == current->pid) {
 			task[i]->father = 1;
+            //如果子进程为僵死状态，就要想进程1发送终止信号
 			if (task[i]->state == TASK_ZOMBIE)
 				/* assumption task[1] is always init */
 				(void) send_sig(SIGCHLD, task[1], 1);
 		}
+
+    //解除shell进程与其他进程，文件，终端等关系
 	for (i=0 ; i<NR_OPEN ; i++)
 		if (current->filp[i])
 			sys_close(i);
@@ -126,10 +133,15 @@ int do_exit(long code)
 		last_task_used_math = NULL;
 	if (current->leader)
 		kill_session();
+    //将当前进程设置为僵死状态
 	current->state = TASK_ZOMBIE;
 	current->exit_code = code;
+
+    //给进程1发信号，通知它shell进程即将推出
 	tell_father(current->father);
-	schedule();
+
+    //进程切换
+    schedule();
 	return (-1);	/* just to suppress warnings */
 }
 
