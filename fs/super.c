@@ -185,7 +185,7 @@ static struct super_block * read_super(int dev)
     //牺牲一个i节点，以防止查找算法返回0
 	s->s_imap[0]->b_data[0] |= 1;
 	s->s_zmap[0]->b_data[0] |= 1; //与0号i节点混淆?
-	free_super(s);
+	free_super(s); //超级块设置完毕，解除对超级块项的保护
 	return s;
 }
 
@@ -228,16 +228,22 @@ int sys_mount(char * dev_name, char * dir_name, int rw_flag)
 	struct super_block * sb;
 	int dev;
 
-	if (!(dev_i=namei(dev_name)))
+	if (!(dev_i=namei(dev_name))) //获取hd1设备文件inode
 		return -ENOENT;
-	dev = dev_i->i_zone[0];
+
+	dev = dev_i->i_zone[0]; //通过inode获取设备号
+
+    //如果hd1文件不是块设备文件
 	if (!S_ISBLK(dev_i->i_mode)) {
-		iput(dev_i);
+		iput(dev_i); //就释放掉它的inode
 		return -EPERM;
 	}
+
+    //释放hd1设备文件inode
 	iput(dev_i);
 	if (!(dir_i=namei(dir_name)))
 		return -ENOENT;
+
 	if (dir_i->i_count != 1 || dir_i->i_num == ROOT_INO) {
 		iput(dir_i);
 		return -EBUSY;
@@ -246,6 +252,8 @@ int sys_mount(char * dev_name, char * dir_name, int rw_flag)
 		iput(dir_i);
 		return -EPERM;
 	}
+
+    //通过设备号，读取设备的超级块
 	if (!(sb=read_super(dev))) {
 		iput(dir_i);
 		return -EBUSY;
@@ -258,9 +266,11 @@ int sys_mount(char * dev_name, char * dir_name, int rw_flag)
 		iput(dir_i);
 		return -EPERM;
 	}
-	sb->s_imount=dir_i;
-	dir_i->i_mount=1;
-	dir_i->i_dirt=1;		/* NOTE! we don't iput(dir_i) */
+	sb->s_imount=dir_i; //将超级块中s_imount与根文件系统中dir_i挂接
+	dir_i->i_mount=1;   //给dir_i做标记，表明该i节点上已经挂接了文件系统
+	dir_i->i_dirt=1;	//给dir_i做标记，表明i节点上的信息已经被更改
+
+                        /* NOTE! we don't iput(dir_i) */
 	return 0;			/* we do that in umount */
 }
 

@@ -40,9 +40,9 @@ void buffer_init(long buffer_end);
 #define Z_MAP_SLOTS 8
 #define SUPER_MAGIC 0x137F
 
-#define NR_OPEN 20
+#define NR_OPEN 20   //进程可以打开文件的最大数
 #define NR_INODE 32
-#define NR_FILE 64
+#define NR_FILE 64  //操作系统可以打开文件的最大数
 #define NR_SUPER 8
 #define NR_HASH 307
 #define NR_BUFFERS nr_buffers
@@ -114,11 +114,11 @@ struct m_inode {
 };
 
 struct file {
-	unsigned short f_mode;
-	unsigned short f_flags;
-	unsigned short f_count;
-	struct m_inode * f_inode;
-	off_t f_pos;
+	unsigned short f_mode;    //文件操作模式
+	unsigned short f_flags;   //文件打开，控制标志
+	unsigned short f_count;   //文件句柄
+	struct m_inode * f_inode; //指向文件对应的inode
+	off_t f_pos;              //文件位置（读写偏移）
 };
 
 struct super_block {
