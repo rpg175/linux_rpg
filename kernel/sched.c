@@ -107,16 +107,18 @@ void schedule(void)
 	struct task_struct ** p;
 
 /* check alarm, wake up any interruptible tasks that have got a signal */
-
+    //遍历所有进程
 	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
 		if (*p) {
 			if ((*p)->alarm && (*p)->alarm < jiffies) { //如果设置了定时或定时已过
 					(*p)->signal |= (1<<(SIGALRM-1));   //设置SIGALRM
 					(*p)->alarm = 0;                    //alarm 清0
 				}
+
+            //发现进程1接收到了信号并且处于可中断等待状态
 			if (((*p)->signal & ~(_BLOCKABLE & (*p)->blocked)) &&
 			(*p)->state==TASK_INTERRUPTIBLE)
-				(*p)->state=TASK_RUNNING;
+				(*p)->state=TASK_RUNNING; //将进程1设置为就绪态
 		}
 
 /* this is the scheduler proper: */
@@ -140,7 +142,7 @@ void schedule(void)
 				(*p)->counter = ((*p)->counter >> 1) +
 						(*p)->priority;
 	}
-    //找不到可以执行的进程，next为0，即执行进程0，0特权级
+    //找不到可以执行的进程，next为0，即执行进程0，0特权级，找到可以执行的进程，切换到该进程执行
 	switch_to(next);
 }
 

@@ -80,6 +80,7 @@ int sys_kill(int pid,int sig)
 	return retval;
 }
 
+//通知父进程，有子进程退出
 static void tell_father(int pid)
 {
 	int i;
@@ -90,6 +91,7 @@ static void tell_father(int pid)
 				continue;
 			if (task[i]->pid != pid)
 				continue;
+            //给父进程发送SIGCHLD信号
 			task[i]->signal |= (1<<(SIGCHLD-1));
 			return;
 		}
