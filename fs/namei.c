@@ -129,20 +129,26 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 	if (!(bh = bread((*dir)->i_dev,block)))
 		return NULL;
 	i = 0;
+
+    //让de指向缓冲块首地址
 	de = (struct dir_entry *) bh->b_data;
-	while (i < entries) {
+
+    while (i < entries) { //在缓冲块的所有目录项中查找目标文件目录项
 		if ((char *)de >= BLOCK_SIZE+bh->b_data) {
 			brelse(bh);
 			bh = NULL;
+            //如果缓冲区全部搜索完，还是没有找到目标文件目录项
 			if (!(block = bmap(*dir,i/DIR_ENTRIES_PER_BLOCK)) ||
-			    !(bh = bread((*dir)->i_dev,block))) {
+			    !(bh = bread((*dir)->i_dev,block))) {//继续载入目录项，继续查找
 				i += DIR_ENTRIES_PER_BLOCK;
 				continue;
 			}
 			de = (struct dir_entry *) bh->b_data;
 		}
+
+        //目录项匹配确认
 		if (match(namelen,name,de)) {
-			*res_dir = de;
+			*res_dir = de; //如果找到了目标目录项，就交给*res_dir指针
 			return bh;
 		}
 		de++;
