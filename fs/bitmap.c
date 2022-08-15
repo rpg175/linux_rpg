@@ -140,11 +140,14 @@ struct m_inode * new_inode(int dev)
 	struct buffer_head * bh;
 	int i,j;
 
+    //从inode_table[32]中获取空闲i节点
 	if (!(inode=get_empty_inode()))
 		return NULL;
+    //获取设备超级块
 	if (!(sb = get_super(dev)))
 		panic("new_inode with unknown device");
 	j = 8192;
+    //根据超级块中inode位图信息，设置inode节点位图
 	for (i=0 ; i<8 ; i++)
 		if ((bh=sb->s_imap[i]))
 			if ((j=find_first_zero(bh->b_data))<8192)
@@ -155,6 +158,8 @@ struct m_inode * new_inode(int dev)
 	}
 	if (set_bit(j,bh->b_data))
 		panic("new_inode: bit already set");
+
+    //将缓冲块设置为脏数据
 	bh->b_dirt = 1;
 	inode->i_count=1;
 	inode->i_nlinks=1;
