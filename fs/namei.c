@@ -185,12 +185,16 @@ static struct buffer_head * add_entry(struct m_inode * dir,
 #endif
 	if (!namelen)
 		return NULL;
-	if (!(block = dir->i_zone[0]))
+	if (!(block = dir->i_zone[0])) //确定目标目录文件第一个文件块在设备上的逻辑块号
 		return NULL;
-	if (!(bh = bread(dir->i_dev,block)))
+	if (!(bh = bread(dir->i_dev,block))) //将目录文件的内容载入一个数据块
 		return NULL;
 	i = 0;
 	de = (struct dir_entry *) bh->b_data;
+
+    //在目录文件中搜索空闲目录项
+    //如果整个数据块中都没有空闲项，就载入下一个数据块继续搜索
+    //全部载入后仍然没有，就在设备上新建数据块，用于加载新目录项
 	while (1) {
 		if ((char *)de >= BLOCK_SIZE+bh->b_data) {
 			brelse(bh);
@@ -204,12 +208,15 @@ static struct buffer_head * add_entry(struct m_inode * dir,
 			}
 			de = (struct dir_entry *) bh->b_data;
 		}
+        //如果在数据块的末端找到空闲项，就在空闲位置加载目录项
 		if (i*sizeof(struct dir_entry) >= dir->i_size) {
 			de->inode=0;
 			dir->i_size = (i+1)*sizeof(struct dir_entry);
 			dir->i_dirt = 1;
 			dir->i_ctime = CURRENT_TIME;
 		}
+
+        //在数据块的中间某位置找到空闲项，就在该位置加载目录项
 		if (!de->inode) {
 			dir->i_mtime = CURRENT_TIME;
 			for (i=0; i < NAME_LEN ; i++)
