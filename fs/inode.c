@@ -74,11 +74,17 @@ static int _bmap(struct m_inode * inode,int block,int create)
 	struct buffer_head * bh;
 	int i;
 
+    //如果待操作文件数块号小于0
 	if (block<0)
 		panic("_bmap: block<0");
+
+    //如果待操作文件数据块号大于允许的文件数据量最大值
 	if (block >= 7+512+512*512)
 		panic("_bmap: block>big");
+
+    //待操作数据块文件块号小于7
 	if (block<7) {
+        //如果是创建一个函数块
 		if (create && !inode->i_zone[block])
 			if ((inode->i_zone[block]=new_block(inode->i_dev))) {
 				inode->i_ctime=CURRENT_TIME;
@@ -87,17 +93,25 @@ static int _bmap(struct m_inode * inode,int block,int create)
 		return inode->i_zone[block];
 	}
 	block -= 7;
+
+    //大于7、小于等于（7+512）个逻辑块的情况
 	if (block<512) {
+        //待操作数据块文件块号小于512，需要一级间接检索文件块号
 		if (create && !inode->i_zone[7])
 			if ((inode->i_zone[7]=new_block(inode->i_dev))) {
 				inode->i_dirt=1;
 				inode->i_ctime=CURRENT_TIME;
 			}
+        //一级间接块中没有索引号，无法继续查找，直接返回0
 		if (!inode->i_zone[7])
 			return 0;
+        //获取一级间接块
 		if (!(bh = bread(inode->i_dev,inode->i_zone[7])))
 			return 0;
+        //取该间接块上第block项中的逻辑块
 		i = ((unsigned short *) (bh->b_data))[block];
+
+        //如果是创建一个新数据块，执行下面代码
 		if (create && !i)
 			if ((i=new_block(inode->i_dev))) {
 				((unsigned short *) (bh->b_data))[block]=i;
@@ -144,6 +158,7 @@ int bmap(struct m_inode * inode,int block)
 
 int create_block(struct m_inode * inode, int block)
 {
+    //最后一个参数是创建标志位，变量为1，表示有可能创建数据块
 	return _bmap(inode,block,1);
 }
 		
