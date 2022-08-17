@@ -120,17 +120,23 @@ static int _bmap(struct m_inode * inode,int block,int create)
 		brelse(bh);
 		return i;
 	}
+    //大于（7+512）、小于（7+512+512×512）个逻辑块的情况
 	block -= 512;
 	if (create && !inode->i_zone[8])
 		if ((inode->i_zone[8]=new_block(inode->i_dev))) {
 			inode->i_dirt=1;
 			inode->i_ctime=CURRENT_TIME;
 		}
+
+    //一级间接块中没有索引号，无法继续查找，直接返回0
 	if (!inode->i_zone[8])
 		return 0;
-	if (!(bh=bread(inode->i_dev,inode->i_zone[8])))
+
+    if (!(bh=bread(inode->i_dev,inode->i_zone[8]))) //获取一级间接块
 		return 0;
-	i = ((unsigned short *)bh->b_data)[block>>9];
+
+    //取该间接块上第block/512项中的逻辑块号
+    i = ((unsigned short *)bh->b_data)[block>>9];
 	if (create && !i)
 		if ((i=new_block(inode->i_dev))) {
 			((unsigned short *) (bh->b_data))[block>>9]=i;
@@ -139,6 +145,8 @@ static int _bmap(struct m_inode * inode,int block,int create)
 	brelse(bh);
 	if (!i)
 		return 0;
+
+    //获取二级间接块
 	if (!(bh=bread(inode->i_dev,i)))
 		return 0;
 	i = ((unsigned short *)bh->b_data)[block&511];
@@ -147,6 +155,10 @@ static int _bmap(struct m_inode * inode,int block,int create)
 			((unsigned short *) (bh->b_data))[block&511]=i;
 			bh->b_dirt=1;
 		}
+    //create标志置位，不等于就要创建一个新数据块，必须确保文件的下一个文件块不存在，
+    // 即！inode-＞i_zone[……]或！i成立，才能创建新数据块。比如本实例中加载目录项的内容，
+    // 一个数据块中没有发现空闲项，很可能下一个数据块中就有，如果强行分配新数据块，
+    // 就会把已有的块覆盖掉，导致目录文件管理混乱。
 	brelse(bh);
 	return i;
 }

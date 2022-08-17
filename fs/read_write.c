@@ -90,13 +90,25 @@ int sys_read(unsigned int fd,char * buf,int count)
 	return -EINVAL;
 }
 
+//操作系统对写文件操作的规定是：
+// 进程空间的数据先要写入缓冲区中，
+// 然后操作系统在适当的条件下，
+// 将缓冲区中的数据同步到外设上。
+// 而且，操作系统只能以数据块（1 KB）为单位，
+// 将缓冲区中的缓冲块（1 KB）的数据同步到外设上。
+// 这就需要在同步之前，缓冲块与外设上要写入的逻辑块进行一对一绑定，
+// 确定外设上的写入位置，以此保证用户空间写入缓冲块的数据，
+// 能够准确地同步到指定逻辑块中
 int sys_write(unsigned int fd,char * buf,int count)
 {
 	struct file * file;
 	struct m_inode * inode;
-	
+
+    //fd,count是否在合理范围内及文件是否已经打开
 	if (fd>=NR_OPEN || count <0 || !(file=current->filp[fd]))
 		return -EINVAL;
+
+    //如何写入字节数为0，直接返回
 	if (!count)
 		return 0;
 	inode=file->f_inode;
@@ -106,8 +118,11 @@ int sys_write(unsigned int fd,char * buf,int count)
 		return rw_char(WRITE,inode->i_zone[0],buf,count,&file->f_pos);
 	if (S_ISBLK(inode->i_mode))
 		return block_write(inode->i_zone[0],&file->f_pos,buf,count);
+
+    //待写入文件是普通文件
 	if (S_ISREG(inode->i_mode))
 		return file_write(inode,file,buf,count);
+    
 	printk("(Write)inode->i_mode=%06o\n\r",inode->i_mode);
 	return -EINVAL;
 }

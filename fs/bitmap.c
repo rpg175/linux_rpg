@@ -72,34 +72,45 @@ void free_block(int dev, int block)
 	sb->s_zmap[block/8192]->b_dirt = 1;
 }
 
+// 具体的创建工作是在new_block（）函数中进行的，内容包括两部分：
+// 1）将新建数据块对应的逻辑块位图置1。
+// 2）在缓冲区中为新建的数据块申请缓冲块，用以承载写入的内容
 int new_block(int dev)
 {
 	struct buffer_head * bh;
 	struct super_block * sb;
 	int i,j;
 
+    //获取设备的超级块（安装文件系统时已载入）
 	if (!(sb = get_super(dev)))
 		panic("trying to get new block from nonexistant device");
 	j = 8192;
+
+    //以下是根据超级块中逻辑块位图信息，对新数据块的逻辑块位图进行设置
 	for (i=0 ; i<8 ; i++)
 		if ((bh=sb->s_zmap[i]))
 			if ((j=find_first_zero(bh->b_data))<8192)
 				break;
 	if (i>=8 || !bh || j>=8192)
 		return 0;
+
 	if (set_bit(j,bh->b_data))
 		panic("new_block: bit already set");
+
+    //将逻辑块位图所在的缓冲块使用标记置1
 	bh->b_dirt = 1;
-	j += i*8192 + sb->s_firstdatazone-1;
+	j += i*8192 + sb->s_firstdatazone-1; //确定数据块逻辑块号
 	if (j >= sb->s_nzones)
 		return 0;
+
+    //在缓冲区中，为新的数据块申请一个空闲缓冲块
 	if (!(bh=getblk(dev,j)))
 		panic("new_block: cannot get block");
 	if (bh->b_count != 1)
 		panic("new block: count is != 1");
-	clear_block(bh->b_data);
-	bh->b_uptodate = 1;
-	bh->b_dirt = 1;
+	clear_block(bh->b_data); //将该逻辑块中数据清零
+	bh->b_uptodate = 1;      //设置为更新数据
+	bh->b_dirt = 1;          //设置为脏数据
 	brelse(bh);
 	return j;
 }

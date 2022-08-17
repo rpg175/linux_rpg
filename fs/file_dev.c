@@ -45,6 +45,9 @@ int file_read(struct m_inode * inode, struct file * filp, char * buf, int count)
 	return (count-left)?(count-left):-ERROR;
 }
 
+// 先检查f_flags标志位来确定写入位置，
+// 之后，调用create_block()函数，
+// 创建一个与该文件位置对应的外设逻辑块，并返回逻辑块号。
 int file_write(struct m_inode * inode, struct file * filp, char * buf, int count)
 {
 	off_t pos;
@@ -57,13 +60,17 @@ int file_write(struct m_inode * inode, struct file * filp, char * buf, int count
  * ok, append may not work when many processes are writing at the same time
  * but so what. That way leads to madness anyway.
  */
+    //设置了文件尾部加写标志
 	if (filp->f_flags & O_APPEND)
-		pos = inode->i_size;
+		pos = inode->i_size; //pos移至文件尾部
 	else
-		pos = filp->f_pos;
+		pos = filp->f_pos; //直接从文件指针f_pos当前指向的位置处开始写入数据
+
 	while (i<count) {
+        //创建逻辑块，并返回块号（将新建数据块对应的逻辑块位图置1，在缓冲区中为新建的数据块申请缓冲块设置为脏和更新）
 		if (!(block = create_block(inode,pos/BLOCK_SIZE)))
 			break;
+        //申请缓冲块，不需要读出来
 		if (!(bh=bread(inode->i_dev,block)))
 			break;
 		c = pos % BLOCK_SIZE;
