@@ -73,6 +73,8 @@ int file_write(struct m_inode * inode, struct file * filp, char * buf, int count
         //申请缓冲块，不需要读出来
 		if (!(bh=bread(inode->i_dev,block)))
 			break;
+
+        //开始计算向缓冲块写入字节数
 		c = pos % BLOCK_SIZE;
 		p = c + bh->b_data;
 		bh->b_dirt = 1;
@@ -84,7 +86,8 @@ int file_write(struct m_inode * inode, struct file * filp, char * buf, int count
 			inode->i_dirt = 1;
 		}
 		i += c;
-		while (c-->0)
+		//计算结束，将数据写入指定的缓冲块
+        while (c-->0)
 			*(p++) = get_fs_byte(buf++);
 		brelse(bh);
 	}
