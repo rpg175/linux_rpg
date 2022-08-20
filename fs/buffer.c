@@ -246,7 +246,9 @@ repeat:
 	wait_on_buffer(bh); //缓冲块没有加锁
 	if (bh->b_count) //第一次缓冲块计数为0
 		goto repeat;
-	while (bh->b_dirt) { //第一次缓冲块的内容没有被修改
+
+    //虽然找到了空闲缓冲块，但仍然是脏的，说明缓冲区已经无可用的缓冲块了，需要同步腾空缓冲块了
+	while (bh->b_dirt) {
 		sync_dev(bh->b_dev);
 		wait_on_buffer(bh);
 		if (bh->b_count)

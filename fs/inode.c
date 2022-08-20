@@ -62,10 +62,13 @@ void sync_inodes(void)
 	struct m_inode * inode;
 
 	inode = 0+inode_table;
+    //遍历所有inode
 	for(i=0 ; i<NR_INODE ; i++,inode++) {
+        //如果遍历到inode正在使用就等待indoe解锁
 		wait_on_inode(inode);
+        //如果inode节点内容已经被改动过，而且不是管道文件的inode
 		if (inode->i_dirt && !inode->i_pipe)
-			write_inode(inode);
+			write_inode(inode); //将inode 同步到缓冲区
 	}
 }
 
@@ -351,22 +354,32 @@ static void write_inode(struct m_inode * inode)
 	struct buffer_head * bh;
 	int block;
 
+    //先将inode加锁，保证写数据的原子性
 	lock_inode(inode);
 	if (!inode->i_dirt || !inode->i_dev) {
 		unlock_inode(inode);
 		return;
 	}
+
+    //获取外设超级块
 	if (!(sb=get_super(inode->i_dev)))
 		panic("trying to write inode without device");
 	block = 2 + sb->s_imap_blocks + sb->s_zmap_blocks +
-		(inode->i_num-1)/INODES_PER_BLOCK;
+		(inode->i_num-1)/INODES_PER_BLOCK; //确定inode位图在外设上的逻辑块号
+
+    //将inode所在的逻辑块加载入缓冲区
 	if (!(bh=bread(inode->i_dev,block)))
 		panic("unable to read i-node block");
+
+    //将inode同步到缓冲区
 	((struct d_inode *)bh->b_data)
 		[(inode->i_num-1)%INODES_PER_BLOCK] =
 			*(struct d_inode *)inode;
+    //缓冲块设置为脏
 	bh->b_dirt=1;
+    //将inode设置为0
 	inode->i_dirt=0;
 	brelse(bh);
+    //解锁inode
 	unlock_inode(inode);
 }

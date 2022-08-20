@@ -22,6 +22,7 @@ extern int file_read(struct m_inode * inode, struct file * filp,
 extern int file_write(struct m_inode * inode, struct file * filp,
 		char * buf, int count);
 
+// 调整文件操作指针，offset是f_pos进行
 int sys_lseek(unsigned int fd,off_t offset, int origin)
 {
 	struct file * file;
@@ -122,7 +123,7 @@ int sys_write(unsigned int fd,char * buf,int count)
     //待写入文件是普通文件
 	if (S_ISREG(inode->i_mode))
 		return file_write(inode,file,buf,count);
-    
+
 	printk("(Write)inode->i_mode=%06o\n\r",inode->i_mode);
 	return -EINVAL;
 }
