@@ -50,12 +50,17 @@ int sys_sync(void)
 	int i;
 	struct buffer_head * bh;
 
+    //将inode写入缓冲区
 	sync_inodes();		/* write out inodes into buffers */
 	bh = start_buffer;
+
+    //遍历整个缓冲区
 	for (i=0 ; i<NR_BUFFERS ; i++,bh++) {
+        //如果那个缓冲块正在使用，就等待这个缓冲块解锁
 		wait_on_buffer(bh);
+        //如果该缓冲块是脏的
 		if (bh->b_dirt)
-			ll_rw_block(WRITE,bh);
+			ll_rw_block(WRITE,bh); //将缓冲块的内容同步到外设中
 	}
 	return 0;
 }
