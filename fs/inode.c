@@ -181,9 +181,11 @@ void iput(struct m_inode * inode)
 {
 	if (!inode)
 		return;
+    //如果inode被使用，等待inode解锁
 	wait_on_inode(inode);
 	if (!inode->i_count)
 		panic("iput: trying to free free inode");
+    //inode是管道文件的inode
 	if (inode->i_pipe) {
 		wake_up(&inode->i_wait);
 		if (--inode->i_count)
@@ -194,29 +196,36 @@ void iput(struct m_inode * inode)
 		inode->i_pipe=0;
 		return;
 	}
+    //inode所在的设备号为0
 	if (!inode->i_dev) {
 		inode->i_count--;
 		return;
 	}
+    //如果inode是块设备文件的inode，需要同步到外设上（硬盘，软盘，网络）
 	if (S_ISBLK(inode->i_mode)) {
 		sync_dev(inode->i_zone[0]);
 		wait_on_inode(inode);
 	}
 repeat:
+    //inode的引用计数大于1
 	if (inode->i_count>1) {
+        //将引用计数器减1
 		inode->i_count--;
 		return;
 	}
+    //inode的的链接数为0
 	if (!inode->i_nlinks) {
 		truncate(inode);
 		free_inode(inode);
 		return;
 	}
+    //inode是脏的，需要同步到外设
 	if (inode->i_dirt) {
 		write_inode(inode);	/* we can sleep - so do again */
 		wait_on_inode(inode);
 		goto repeat;
 	}
+    //inode引用计数减1
 	inode->i_count--;
 	return;
 }
