@@ -111,7 +111,7 @@ static inline void end_request(int uptodate)
 	DEVICE_OFF(CURRENT->dev);
 	if (CURRENT->bh) {
 		CURRENT->bh->b_uptodate = uptodate; ///uptodate是参数，为1
-		unlock_buffer(CURRENT->bh); //为缓冲块解锁，并调用wake_up()设置进程1位就绪态
+		unlock_buffer(CURRENT->bh); //为缓冲块解锁，并调用wake_up()设置进程1为就绪态
 	}
 	if (!uptodate) {
 		printk(DEVICE_NAME " I/O error\n\r");
