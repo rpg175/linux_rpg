@@ -193,6 +193,7 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 				continue;
             //设置页表项属性，2是010，～2是101，代表用户、只读、存在
 			this_page &= ~2;
+            //将共享的页面设置为只读操作
 			*to_page_table = this_page;
             //1MB以内的内核区不参与用户分页管理
 			if (this_page > LOW_MEM) {
